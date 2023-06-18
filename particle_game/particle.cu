@@ -42,12 +42,12 @@ __global__ void DrawParticles(cudaSurfaceObject_t s, particle* poolCur, dim3 tex
   surf2Dwrite(data, s, (x + 1) * sizeof(uchar4), y + 1);
 }
 
-__global__ void Update(particle* poolPrev, particle* poolCur)
+__global__ void Update(particle* poolPrev, particle* poolCur, double timeDelta)
 {
   unsigned int i = blockIdx.x;
-  poolCur[i].x = poolPrev[i].x + poolPrev[i].vx;
-  poolCur[i].y = poolPrev[i].y + poolPrev[i].vy;
-  poolCur[i].aliveTime = max(poolPrev[i].aliveTime - 1.f, 0.f);
+  poolCur[i].x = poolPrev[i].x + poolPrev[i].vx * timeDelta;
+  poolCur[i].y = poolPrev[i].y + poolPrev[i].vy * timeDelta;
+  poolCur[i].aliveTime = max(poolPrev[i].aliveTime - timeDelta, 0.f);
   poolCur[i].type = poolPrev[i].aliveTime > 0 ? poolPrev[i].type : PART_DEAD;
 }
 
@@ -71,7 +71,7 @@ __global__ void Spawn(particle* poolCur)
       for (int k = startSlot; k < 2000; k++) // max particles here
         if (poolCur[k].type == PART_DEAD)
         {
-          particle p = { sp.x, sp.y, sp.vx + (random() % 10) * sp.spread, sp.vy + (random() % 10) * sp.spread, sp.type, 200 };
+          particle p = { sp.x, sp.y, sp.vx + (random() % 10) * sp.spread, sp.vy + (random() % 10) * sp.spread, sp.type, 2000 };
           poolCur[k] = p;
           startSlot = k + 1;
           break;
@@ -79,13 +79,13 @@ __global__ void Spawn(particle* poolCur)
   }
 }
 
-void part_mgr::Compute(cudaSurfaceObject_t s, dim3 texSize)
+void part_mgr::Compute(cudaSurfaceObject_t s, dim3 texSize, double timeDelta)
 {
   dim3 thread(1);
   dim3 block(MAX_PARTICLES);
   dim3 oneBlock(1);
   Spawn<<< oneBlock, thread >>>(partPoolPrev);
-  Update<<< block, thread >>>(partPoolPrev, partPoolCur);
+  Update<<< block, thread >>>(partPoolPrev, partPoolCur, timeDelta);
   DrawParticles <<< block, thread >>>(s, partPoolCur, texSize);
 
   particle* tmp = partPoolPrev;
@@ -113,8 +113,8 @@ void part_mgr::Init(void)
   cudaMemcpy(partPoolPrev, tmp, sizeof(particle) * MAX_PARTICLES, cudaMemcpyHostToDevice);
 
   spawnersHost.nSpawners = 2;
-  spawnersHost.spawners[0] = { 100, 100, 1, 1, PART_FIRST, 0.2, 2 };
-  spawnersHost.spawners[1] = { 500, 500, -1, -1, PART_SECOND, 0.5, 3 };
+  spawnersHost.spawners[0] = { 100, 100, 0.001, 0.001, PART_FIRST, 0.02, 2 };
+  spawnersHost.spawners[1] = { 500, 500, -0.001, -0.001, PART_SECOND, -0.08, 3 };
   cudaMemcpyToSymbol(spawnersDevice, &spawnersHost, sizeof(spawner_cbuf));
 }
 

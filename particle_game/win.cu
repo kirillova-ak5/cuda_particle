@@ -36,6 +36,8 @@ win::win(void) : W(1280), H(736)
 
 void win::Display(void)
 {
+  static clock_t startTime = clock();
+  clock_t endTime;
   glClearColor(1.0f * rand() / RAND_MAX, 1.0f * rand() / RAND_MAX, 1.0f * rand() / RAND_MAX, 1.0f * rand() / RAND_MAX);
   glClear(GL_COLOR_BUFFER_BIT);
 
@@ -55,7 +57,10 @@ void win::Display(void)
   Fill <<< block, thread >>> (writeSurface, texDim); 
 
   // computations
-  Instance.partMgr.Compute(writeSurface, texDim);
+  endTime = clock();
+  double delta = (endTime - startTime) * 1000 / CLOCKS_PER_SEC; // delta time in miliseconds
+  Instance.partMgr.Compute(writeSurface, texDim, delta);
+  startTime = endTime;
 
   e = cudaDestroySurfaceObject(writeSurface);
   e = cudaGraphicsUnmapResources(1, &Instance.screenRes);

@@ -16,7 +16,7 @@ struct particle
   float x, y;   // position
   float vx, vy; // velocity
   part_type type;
-  float aliveTime; // remain time
+  float aliveTime; // remain time in miliseconds
 };
 
 struct spawner
@@ -44,7 +44,7 @@ public:
   static const int MAX_SPAWNERS = 20;
 
   void Init(void);
-  void Compute(cudaSurfaceObject_t s, dim3 texSize);
+  void Compute(cudaSurfaceObject_t s, dim3 texSize, double timeDelta);
   void Kill(void);
 };
 

@@ -4,6 +4,7 @@
 #pragma comment(lib, "LIB/freeglut.lib")
 #include "INCLUDE/glatter/glatter.h"
 #include "INCLUDE/GL/freeglut.h"
+#include "time.h"
 
 #include "particle.h"
 
