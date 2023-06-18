@@ -173,7 +173,7 @@ void part_mgr::Init(void)
     cudaMemcpy(partPoolPrev, tmp, sizeof(particle) * MAX_PARTICLES, cudaMemcpyHostToDevice);
 
     spawnersHost.nSpawners = 3;
-    spawnersHost.spawners[0] = { 300, 700, 0.25, 0.15, PART_FIRST, /*0.05*/ 0, 1, 8, 3000, EARTH_PHYSICS };
+    spawnersHost.spawners[0] = { 600, 500, -0.35, 0.35, PART_FIRST, /*0.05*/ 0, 1, 8, 3000, EARTH_PHYSICS };
     spawnersHost.spawners[1] = {700, 700, -0.25, 0.15, PART_SECOND, /*-0.08*/ 0, 2, 10, 3000, SPACE};
     //spawnersHost.spawners[2] = {500, 500, -0.00015, -0.00015, PART_SECOND, -0.05, 3, 10, 1500, SPACE};
     cudaMemcpyToSymbol(spawnersDevice, &spawnersHost, sizeof(spawner_cbuf));
