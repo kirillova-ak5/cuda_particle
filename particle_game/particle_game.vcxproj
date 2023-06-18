@@ -85,7 +85,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="particle.h" />
+    <ClInclude Include="physics.h" />
     <ClInclude Include="win.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="physics.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

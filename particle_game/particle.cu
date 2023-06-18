@@ -1,9 +1,11 @@
 #include "particle.h"
+#include "physics.h"
 
 #include "cudaGL.h" // for kernel function surf2Dwrite
 #include "device_launch_parameters.h" // for kernel vars blockIdx and etc.
 
 __device__ __constant__ spawner_cbuf spawnersDevice;
+//__device__ __constant__ physics_manager phManager;
 
 
 __global__ void Fill(cudaSurfaceObject_t s, dim3 texDim)
@@ -44,12 +46,14 @@ __global__ void DrawParticles(cudaSurfaceObject_t s, particle* poolCur, dim3 tex
 
 __global__ void Update(particle* poolPrev, particle* poolCur, double timeDelta)
 {
-  unsigned int i = blockIdx.x;
+
+  unsigned int i = blockIdx.x;  
+  //phManager.physicsMakeAction(&poolCur[i]);
+  poolCur[i].vy -= 0.00015 * timeDelta;
   poolCur[i].x = poolPrev[i].x + poolPrev[i].vx * timeDelta;
   poolCur[i].y = poolPrev[i].y + poolPrev[i].vy * timeDelta;
-  poolCur[i].aliveTime = max(poolPrev[i].aliveTime - timeDelta, 0.f);
-  poolCur[i].type = poolPrev[i].aliveTime > 0 ? poolPrev[i].type : PART_DEAD;
-}
+  poolCur[i].remainingAliveTime = max(poolPrev[i].remainingAliveTime - timeDelta, 0.f);
+  poolCur[i].type = poolPrev[i].remainingAliveTime > 0 ? poolPrev[i].type : PART_DEAD;
 
 __device__ unsigned seed = 123456789;
 __device__ unsigned random(void)
@@ -60,7 +64,7 @@ __device__ unsigned random(void)
   seed = (a * seed + c) % m;
   return seed;
 }
-__global__ void Spawn(particle* poolCur)
+__global__ void Spawn(particle* poolCur, int maxParticles)
 {
   int startSlot = 0;
   for (int i = 0; i < spawnersDevice.nSpawners; i++)
@@ -68,10 +72,13 @@ __global__ void Spawn(particle* poolCur)
     spawner sp = spawnersDevice.spawners[i];
     int numToSpawn = sp.intensity;
     for (int j = 0; j < numToSpawn; j++)
-      for (int k = startSlot; k < 2000; k++) // max particles here
+      for (int k = startSlot; k < maxParticles; k++) // max particles here
         if (poolCur[k].type == PART_DEAD)
         {
-          particle p = { sp.x, sp.y, sp.vx + (random() % 10) * sp.spread, sp.vy + (random() % 10) * sp.spread, sp.type, 2000 };
+
+          particle p = { sp.x, sp.y, sp.vx + (random() % sp.directionsCount) * sp.spread, sp.vy + (random() % sp.directionsCount) * sp.spread, 
+                            sp.type, sp.particleAliveTime, sp.particleAliveTime, sp.phType };
+
           poolCur[k] = p;
           startSlot = k + 1;
           break;
@@ -84,7 +91,8 @@ void part_mgr::Compute(cudaSurfaceObject_t s, dim3 texSize, double timeDelta)
   dim3 thread(1);
   dim3 block(MAX_PARTICLES);
   dim3 oneBlock(1);
-  Spawn<<< oneBlock, thread >>>(partPoolPrev);
+
+  Spawn<<< oneBlock, thread >>>(partPoolPrev, MAX_PARTICLES);
   Update<<< block, thread >>>(partPoolPrev, partPoolCur, timeDelta);
   DrawParticles <<< block, thread >>>(s, partPoolCur, texSize);
 
@@ -113,8 +121,8 @@ void part_mgr::Init(void)
   cudaMemcpy(partPoolPrev, tmp, sizeof(particle) * MAX_PARTICLES, cudaMemcpyHostToDevice);
 
   spawnersHost.nSpawners = 2;
-  spawnersHost.spawners[0] = { 100, 100, 0.001, 0.001, PART_FIRST, 0.02, 2 };
-  spawnersHost.spawners[1] = { 500, 500, -0.001, -0.001, PART_SECOND, -0.08, 3 };
+  spawnersHost.spawners[0] = { 100, 100, 0.00015, 0.00015, PART_FIRST, 0.02, 2, 8, 2000, EARTH_PHYSICS };
+  spawnersHost.spawners[1] = { 500, 500, -0.00015, -0.00015, PART_SECOND, -0.08, 3, 6, 1500, SPACE };
   cudaMemcpyToSymbol(spawnersDevice, &spawnersHost, sizeof(spawner_cbuf));
 }
 
