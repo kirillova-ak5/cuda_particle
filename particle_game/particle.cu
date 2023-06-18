@@ -1,5 +1,6 @@
 #include "particle.h"
 #include "physics.h"
+#include "math.h"
 
 #include "cudaGL.h" // for kernel function surf2Dwrite
 #include "device_launch_parameters.h" // for kernel vars blockIdx and etc.
@@ -44,16 +45,67 @@ __global__ void DrawParticles(cudaSurfaceObject_t s, particle* poolCur, dim3 tex
   surf2Dwrite(data, s, (x + 1) * sizeof(uchar4), y + 1);
 }
 
-__global__ void Update(particle* poolPrev, particle* poolCur, double timeDelta)
+__device__ float dist(particle x, particle y) 
 {
+    //return float(sqrt(pow((x.x - y.x), 2) + pow((x.y - y.y), 2)));
+    return float(fabs(x.x - y.x) + fabs(x.y - y.y)); //trying to accelerate app. Manhattan's metrics
+}
 
-  unsigned int i = blockIdx.x;  
-  //phManager.physicsMakeAction(&poolCur[i]);
-  poolCur[i].vy -= 0.00015 * timeDelta;
-  poolCur[i].x = poolPrev[i].x + poolPrev[i].vx * timeDelta;
-  poolCur[i].y = poolPrev[i].y + poolPrev[i].vy * timeDelta;
-  poolCur[i].remainingAliveTime = max(poolPrev[i].remainingAliveTime - timeDelta, 0.f);
-  poolCur[i].type = poolPrev[i].remainingAliveTime > 0 ? poolPrev[i].type : PART_DEAD;
+__device__ void CollisionCheck(particle* poolPrev, particle* poolCur, int maxParticles)
+{
+    unsigned int i = blockIdx.x;
+    float t;
+    for (int j = i+1; j < maxParticles; j++)
+    {
+        if (poolPrev[i].type != PART_DEAD && poolPrev[j].type != PART_DEAD)
+        {
+            if (poolPrev[i].type != poolPrev[j].type)
+            {
+                if (dist(poolPrev[i], poolPrev[j]) < 2) 
+                {
+                    //first method
+                    /*t = poolPrev[i].vx;
+                    poolPrev[i].vx = 0.5 * (poolPrev[j].vx + t);
+                    poolPrev[j].vx = 0.5 * (poolPrev[j].vx + t);
+
+                    t = poolPrev[i].vy;
+                    poolPrev[i].vy = 0.5 * (poolPrev[j].vy + t);
+                    poolPrev[j].vy = 0.5 * (poolPrev[j].vy + t);*/
+
+                    //second method
+                    t = poolPrev[i].vx;
+                    poolPrev[i].vx = poolPrev[j].vx;
+                    poolPrev[j].vx = t;
+
+                    t = poolPrev[i].vy;
+                    poolPrev[i].vy = poolPrev[j].vy;
+                    poolPrev[j].vy = t;
+
+                    //third method
+                    /*poolPrev[i].vx += poolPrev[j].vx;
+                    poolPrev[i].vy += poolPrev[j].vy;
+                    poolPrev[j].vx = 2 * poolPrev[j].vx + poolPrev[i].vx;
+                    poolPrev[j].vy = 2 * poolPrev[j].vy + poolPrev[i].vy;*/
+
+                }
+            }
+        }
+        
+    }
+}
+
+__global__ void Update(particle* poolPrev, particle* poolCur, double timeDelta, int maxParticles)
+{
+    unsigned int i = blockIdx.x;
+    //phManager.physicsMakeAction(&poolCur[i]);
+    
+    poolCur[i].vy -= 0.00015 * timeDelta;   //уберу константу потом, когда решится вопрос с физикой
+    poolCur[i].x = poolPrev[i].x + poolPrev[i].vx * timeDelta;
+    poolCur[i].y = poolPrev[i].y + poolPrev[i].vy * timeDelta;
+    CollisionCheck(poolPrev, poolCur, maxParticles);
+    poolCur[i].remainingAliveTime = max(poolPrev[i].remainingAliveTime - timeDelta, 0.f);
+    poolCur[i].type = poolPrev[i].remainingAliveTime > 0 ? poolPrev[i].type : PART_DEAD;
+}
 
 __device__ unsigned seed = 123456789;
 __device__ unsigned random(void)
@@ -93,7 +145,7 @@ void part_mgr::Compute(cudaSurfaceObject_t s, dim3 texSize, double timeDelta)
   dim3 oneBlock(1);
 
   Spawn<<< oneBlock, thread >>>(partPoolPrev, MAX_PARTICLES);
-  Update<<< block, thread >>>(partPoolPrev, partPoolCur, timeDelta);
+  Update<<< block, thread >>>(partPoolPrev, partPoolCur, timeDelta, MAX_PARTICLES);
   DrawParticles <<< block, thread >>>(s, partPoolCur, texSize);
 
   particle* tmp = partPoolPrev;
@@ -103,27 +155,28 @@ void part_mgr::Compute(cudaSurfaceObject_t s, dim3 texSize, double timeDelta)
 
 void part_mgr::Init(void)
 {
-  cudaError_t cudaStatus = cudaSuccess;
-  particle tmp[MAX_PARTICLES];
-  for (int i = 0; i < MAX_PARTICLES; i++)
-  {
-    particle p = { 0, 0, 0, 0, PART_DEAD, 0 };
-    tmp[i] = p;
-  }
-  cudaStatus = cudaMalloc(&partPoolCur, sizeof(particle) * MAX_PARTICLES);
-  if (cudaStatus != cudaSuccess)
-    fprintf(stderr, "failed!");
-  cudaStatus = cudaMalloc(&partPoolPrev, sizeof(particle) * MAX_PARTICLES);
-  if (cudaStatus != cudaSuccess)
-    fprintf(stderr, "failed!");
+    cudaError_t cudaStatus = cudaSuccess;
+    particle tmp[MAX_PARTICLES];
+    for (int i = 0; i < MAX_PARTICLES; i++)
+    {
+        particle p = { 0, 0, 0, 0, PART_DEAD, 0, 0, SPACE };
+        tmp[i] = p;
+    }
+    cudaStatus = cudaMalloc(&partPoolCur, sizeof(particle) * MAX_PARTICLES);
+    if (cudaStatus != cudaSuccess)
+        fprintf(stderr, "failed!");
+    cudaStatus = cudaMalloc(&partPoolPrev, sizeof(particle) * MAX_PARTICLES);
+    if (cudaStatus != cudaSuccess)
+        fprintf(stderr, "failed!");
 
-  cudaMemcpy(partPoolCur, tmp, sizeof(particle) * MAX_PARTICLES, cudaMemcpyHostToDevice);
-  cudaMemcpy(partPoolPrev, tmp, sizeof(particle) * MAX_PARTICLES, cudaMemcpyHostToDevice);
+    cudaMemcpy(partPoolCur, tmp, sizeof(particle) * MAX_PARTICLES, cudaMemcpyHostToDevice);
+    cudaMemcpy(partPoolPrev, tmp, sizeof(particle) * MAX_PARTICLES, cudaMemcpyHostToDevice);
 
-  spawnersHost.nSpawners = 2;
-  spawnersHost.spawners[0] = { 100, 100, 0.00015, 0.00015, PART_FIRST, 0.02, 2, 8, 2000, EARTH_PHYSICS };
-  spawnersHost.spawners[1] = { 500, 500, -0.00015, -0.00015, PART_SECOND, -0.08, 3, 6, 1500, SPACE };
-  cudaMemcpyToSymbol(spawnersDevice, &spawnersHost, sizeof(spawner_cbuf));
+    spawnersHost.nSpawners = 3;
+    spawnersHost.spawners[0] = { 300, 700, 0.25, 0.15, PART_FIRST, /*0.05*/ 0, 1, 8, 3000, EARTH_PHYSICS };
+    spawnersHost.spawners[1] = {700, 700, -0.25, 0.15, PART_SECOND, /*-0.08*/ 0, 2, 10, 3000, SPACE};
+    //spawnersHost.spawners[2] = {500, 500, -0.00015, -0.00015, PART_SECOND, -0.05, 3, 10, 1500, SPACE};
+    cudaMemcpyToSymbol(spawnersDevice, &spawnersHost, sizeof(spawner_cbuf));
 }
 
 void part_mgr::Kill(void)

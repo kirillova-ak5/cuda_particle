@@ -35,6 +35,8 @@ struct spawner
   int directionsCount;
   float particleAliveTime; //in ms
   physics_type phType;
+
+  
 };
 struct spawner_cbuf
 {
@@ -49,7 +51,7 @@ class part_mgr
   spawner_cbuf spawnersHost;
 
 public:
-  static const int MAX_PARTICLES = 2000;
+  static const int MAX_PARTICLES = 1000;
   static const int MAX_SPAWNERS = 20;
 
   void Init(void);

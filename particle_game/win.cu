@@ -54,7 +54,7 @@ void win::Display(void)
     dim3 thread(32, 32);
     dim3 texDim(Instance.W, Instance.H);
     dim3 block(texDim.x / thread.x, texDim.y / thread.y);
-    Fill << < block, thread >> > (writeSurface, texDim);
+    Fill <<< block, thread >>> (writeSurface, texDim);
 
     // computations
     endTime = clock();
