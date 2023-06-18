@@ -52,7 +52,7 @@ public:
   static const int MAX_SPAWNERS = 20;
 
   void Init(void);
-  void Compute(cudaSurfaceObject_t s, dim3 texSize);
+  void Compute(cudaSurfaceObject_t s, dim3 texSize, double timeDelta);
   void Kill(void);
 };
 

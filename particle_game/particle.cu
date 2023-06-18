@@ -44,11 +44,11 @@ __global__ void DrawParticles(cudaSurfaceObject_t s, particle* poolCur, dim3 tex
   surf2Dwrite(data, s, (x + 1) * sizeof(uchar4), y + 1);
 }
 
-__global__ void Update(particle* poolPrev, particle* poolCur)
+__global__ void Update(particle* poolPrev, particle* poolCur, double timeDelta)
 {
   unsigned int i = blockIdx.x;  
   //phManager.physicsMakeAction(&poolCur[i]);
-  poolCur[i].vy += 1.1 * timeDelta;
+  poolCur[i].vy -= 0.00015 * timeDelta;
   poolCur[i].x = poolPrev[i].x + poolPrev[i].vx * timeDelta;
   poolCur[i].y = poolPrev[i].y + poolPrev[i].vy * timeDelta;
   poolCur[i].remainingAliveTime = max(poolPrev[i].remainingAliveTime - timeDelta, 0.f);
@@ -84,7 +84,7 @@ __global__ void Spawn(particle* poolCur, int maxParticles)
   }
 }
 
-void part_mgr::Compute(cudaSurfaceObject_t s, dim3 texSize)
+void part_mgr::Compute(cudaSurfaceObject_t s, dim3 texSize, double timeDelta)
 {
   dim3 thread(1);
   dim3 block(MAX_PARTICLES);
@@ -118,8 +118,8 @@ void part_mgr::Init(void)
   cudaMemcpy(partPoolPrev, tmp, sizeof(particle) * MAX_PARTICLES, cudaMemcpyHostToDevice);
 
   spawnersHost.nSpawners = 2;
-  spawnersHost.spawners[0] = { 100, 100, 0.001, 0.001, PART_FIRST, 0.02, 2, 10, 2000, EARTH_PHYSICS };
-  spawnersHost.spawners[1] = { 500, 500, -0.001, -0.001, PART_SECOND, -0.08, 3, 15, 1500, SPACE };
+  spawnersHost.spawners[0] = { 100, 100, 0.00015, 0.00015, PART_FIRST, 0.02, 2, 8, 2000, EARTH_PHYSICS };
+  spawnersHost.spawners[1] = { 500, 500, -0.00015, -0.00015, PART_SECOND, -0.08, 3, 6, 1500, SPACE };
   cudaMemcpyToSymbol(spawnersDevice, &spawnersHost, sizeof(spawner_cbuf));
 }
 
