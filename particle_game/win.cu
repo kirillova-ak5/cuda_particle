@@ -73,6 +73,7 @@ void win::Display(void)
     glutSwapBuffers();
     glutPostRedisplay();
 
+
 }
 
 void win::Keyboard(unsigned char Key, int x, int y)

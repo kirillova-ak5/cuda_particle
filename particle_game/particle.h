@@ -22,6 +22,7 @@ struct particle
   float remainingAliveTime; // remain time in miliseconds
   float originAliveTime;	// ms
   physics_type phType;
+
 };
 
 struct spawner

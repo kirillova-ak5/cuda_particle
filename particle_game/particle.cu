@@ -46,6 +46,7 @@ __global__ void DrawParticles(cudaSurfaceObject_t s, particle* poolCur, dim3 tex
 
 __global__ void Update(particle* poolPrev, particle* poolCur, double timeDelta)
 {
+
   unsigned int i = blockIdx.x;  
   //phManager.physicsMakeAction(&poolCur[i]);
   poolCur[i].vy -= 0.00015 * timeDelta;
@@ -53,7 +54,6 @@ __global__ void Update(particle* poolPrev, particle* poolCur, double timeDelta)
   poolCur[i].y = poolPrev[i].y + poolPrev[i].vy * timeDelta;
   poolCur[i].remainingAliveTime = max(poolPrev[i].remainingAliveTime - timeDelta, 0.f);
   poolCur[i].type = poolPrev[i].remainingAliveTime > 0 ? poolPrev[i].type : PART_DEAD;
-}
 
 __device__ unsigned seed = 123456789;
 __device__ unsigned random(void)
@@ -75,8 +75,10 @@ __global__ void Spawn(particle* poolCur, int maxParticles)
       for (int k = startSlot; k < maxParticles; k++) // max particles here
         if (poolCur[k].type == PART_DEAD)
         {
+
           particle p = { sp.x, sp.y, sp.vx + (random() % sp.directionsCount) * sp.spread, sp.vy + (random() % sp.directionsCount) * sp.spread, 
                             sp.type, sp.particleAliveTime, sp.particleAliveTime, sp.phType };
+
           poolCur[k] = p;
           startSlot = k + 1;
           break;
@@ -89,6 +91,7 @@ void part_mgr::Compute(cudaSurfaceObject_t s, dim3 texSize, double timeDelta)
   dim3 thread(1);
   dim3 block(MAX_PARTICLES);
   dim3 oneBlock(1);
+
   Spawn<<< oneBlock, thread >>>(partPoolPrev, MAX_PARTICLES);
   Update<<< block, thread >>>(partPoolPrev, partPoolCur, timeDelta);
   DrawParticles <<< block, thread >>>(s, partPoolCur, texSize);
