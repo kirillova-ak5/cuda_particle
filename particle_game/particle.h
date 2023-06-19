@@ -82,6 +82,8 @@ public:
   void AddSquare(float x1, float y1, float x2, float y2);
   void AddSegment(float x1, float y1, float x2, float y2);
   const shapes_cbuf& GetShapes(void);
+  int SelectShape(int x, int y); // returns shapeHandle
+  void MoveShape(int shapeHandle, int dx, int dy);
 };
 
 __global__ void Fill(cudaSurfaceObject_t s, dim3 texDim);

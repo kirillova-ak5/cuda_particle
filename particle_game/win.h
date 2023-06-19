@@ -19,6 +19,8 @@ private:
   UINT fboId = 0; // frame buffer
   cudaGraphicsResource* screenRes; // cuda resource representation
   part_mgr partMgr;
+  int shapeSelected = -1;
+  int prevX = 0, prevY = 0;
 
 
 public:
@@ -29,6 +31,8 @@ public:
   static void Keyboard(unsigned char Key, int x, int y);
 
   static void Mouse(int button, int state, int x, int y);
+
+  static void MouseMotion(int x, int y);
 
   static void Run(void);
 

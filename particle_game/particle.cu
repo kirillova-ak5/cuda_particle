@@ -230,4 +230,67 @@ const shapes_cbuf& part_mgr::GetShapes(void)
   return shapesHost;
 }
 
+inline int sqr(int x)
+{
+  return x * x;
+}
+
+inline bool btw(int x, int x1, int x2)
+{
+  return x1 < x2 ? (x >= x1 && x <= x2) : (x <= x1 && x >= x2);
+}
+
+inline float dist(int x0, int y0, int x1, int y1, int x2, int y2)
+{
+  return (float)abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1) / sqrt(sqr(y2 - y1) + sqr(x2 - x1));
+}
+
+int part_mgr::SelectShape(int x, int y)
+{
+  for (int i = 0; i < shapesHost.nShapes; i++)
+  {
+    shape& shp = shapesHost.shapes[i];
+    switch (shp.type)
+    {
+    case SHAPE_CIRCLE:
+      if (sqr(x - shp.params[0]) + sqr(y - shp.params[1]) <= sqr(shp.params[2]))
+        return i;
+      break;
+    case SHAPE_SQUARE:
+      if (btw(x, shp.params[0], shp.params[2]) && btw(y, shp.params[1], shp.params[3]))
+        return i;
+    case SHAPE_SEGMENT:
+      if (btw(x, shp.params[0], shp.params[2]) && btw(y, shp.params[1], shp.params[3]) &&
+        dist(x, y, shp.params[0], shp.params[1], shp.params[2], shp.params[3]) < 5)
+        return i;
+        break;
+    default:
+      break;
+    }
+  }
+  return -1;
+}
+
+void part_mgr::MoveShape(int shapeHandle, int dx, int dy)
+{
+  if (shapeHandle < 0 || shapeHandle >= shapesHost.nShapes)
+    return;
+  shape& shp = shapesHost.shapes[shapeHandle];
+  switch (shp.type)
+  {
+  case SHAPE_CIRCLE:
+    shp.params[0] += dx;
+    shp.params[1] += dy;
+    break;
+  case SHAPE_SQUARE:
+  case SHAPE_SEGMENT:
+    shp.params[0] += dx;
+    shp.params[1] += dy;
+    shp.params[2] += dx;
+    shp.params[3] += dy;
+    break;
+  default:
+    break;
+  }
+}
 
