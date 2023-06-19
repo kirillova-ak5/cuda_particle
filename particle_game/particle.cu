@@ -6,6 +6,7 @@
 #include "device_launch_parameters.h" // for kernel vars blockIdx and etc.
 
 __device__ __constant__ spawner_cbuf spawnersDevice;
+__device__ __constant__ shapes_cbuf shapesDevice;
 //__device__ __constant__ physics_manager phManager;
 
 
@@ -22,6 +23,14 @@ __global__ void Fill(cudaSurfaceObject_t s, dim3 texDim)
 //  uchar4 data = make_uchar4(255.0f * x / texDim.x, 255.0f * y / texDim.y, 0x00, 0xff);
   uchar4 data = make_uchar4(0x88, 0xBB, 0xBB, 0xff);
   surf2Dwrite(data, s, x * sizeof(uchar4), y);
+}
+
+__global__ void DrawShapes(cudaSurfaceObject_t s)
+{
+  unsigned int i = blockIdx.x;
+  if (i > shapesDevice.nShapes)
+    return;
+  shape shp = shapesDevice.shapes[i];
 }
 
 __global__ void DrawParticles(cudaSurfaceObject_t s, particle* poolCur, dim3 texDim)
@@ -98,7 +107,8 @@ __global__ void Update(particle* poolPrev, particle* poolCur, double timeDelta, 
 {
     unsigned int i = blockIdx.x;
     //phManager.physicsMakeAction(&poolCur[i]);
-    
+    if (poolCur[i].type == PART_DEAD)
+      return;
     poolCur[i].vy -= 0.00015 * timeDelta;   //уберу константу потом, когда решится вопрос с физикой
     poolCur[i].x = poolPrev[i].x + poolPrev[i].vx * timeDelta;
     poolCur[i].y = poolPrev[i].y + poolPrev[i].vy * timeDelta;
@@ -140,17 +150,16 @@ __global__ void Spawn(particle* poolCur, int maxParticles)
 
 void part_mgr::Compute(cudaSurfaceObject_t s, dim3 texSize, double timeDelta)
 {
+  cudaMemcpyToSymbol(shapesDevice, &shapesHost, sizeof(shapes_cbuf));
+
   dim3 thread(1);
   dim3 block(MAX_PARTICLES);
   dim3 oneBlock(1);
 
-  Spawn<<< oneBlock, thread >>>(partPoolPrev, MAX_PARTICLES);
-  Update<<< block, thread >>>(partPoolPrev, partPoolCur, timeDelta, MAX_PARTICLES);
+  Spawn<<< oneBlock, thread >>>(partPoolCur, MAX_PARTICLES);
+  Update<<< block, thread >>>(partPoolCur, partPoolCur, timeDelta, MAX_PARTICLES);
   DrawParticles <<< block, thread >>>(s, partPoolCur, texSize);
 
-  particle* tmp = partPoolPrev;
-  partPoolPrev = partPoolCur;
-  partPoolCur = tmp;
 }
 
 void part_mgr::Init(void)
@@ -165,16 +174,16 @@ void part_mgr::Init(void)
     cudaStatus = cudaMalloc(&partPoolCur, sizeof(particle) * MAX_PARTICLES);
     if (cudaStatus != cudaSuccess)
         fprintf(stderr, "failed!");
-    cudaStatus = cudaMalloc(&partPoolPrev, sizeof(particle) * MAX_PARTICLES);
-    if (cudaStatus != cudaSuccess)
-        fprintf(stderr, "failed!");
+    //cudaStatus = cudaMalloc(&partPoolCur, sizeof(particle) * MAX_PARTICLES);
+    //if (cudaStatus != cudaSuccess)
+    //    fprintf(stderr, "failed!");
 
     cudaMemcpy(partPoolCur, tmp, sizeof(particle) * MAX_PARTICLES, cudaMemcpyHostToDevice);
-    cudaMemcpy(partPoolPrev, tmp, sizeof(particle) * MAX_PARTICLES, cudaMemcpyHostToDevice);
+    //cudaMemcpy(partPoolCur, tmp, sizeof(particle) * MAX_PARTICLES, cudaMemcpyHostToDevice);
 
     spawnersHost.nSpawners = 3;
-    spawnersHost.spawners[0] = { 600, 500, -0.35, 0.35, PART_FIRST, /*0.05*/ 0, 1, 8, 3000, EARTH_PHYSICS };
-    spawnersHost.spawners[1] = {700, 700, -0.25, 0.15, PART_SECOND, /*-0.08*/ 0, 2, 10, 3000, SPACE};
+    spawnersHost.spawners[0] = { 600, 500, -0.35, 0.35, PART_FIRST, 0.005, 1, 8, 3000, EARTH_PHYSICS };
+    spawnersHost.spawners[1] = {700, 700, -0.25, -0.15, PART_SECOND, -0.008, 2, 10, 3000, SPACE};
     //spawnersHost.spawners[2] = {500, 500, -0.00015, -0.00015, PART_SECOND, -0.05, 3, 10, 1500, SPACE};
     cudaMemcpyToSymbol(spawnersDevice, &spawnersHost, sizeof(spawner_cbuf));
 }
@@ -186,10 +195,29 @@ void part_mgr::Kill(void)
   cudaStatus = cudaFree(partPoolCur);
   if (cudaStatus != cudaSuccess)
     fprintf(stderr, "failed!");
-  cudaStatus = cudaFree(partPoolPrev);
-  if (cudaStatus != cudaSuccess)
-    fprintf(stderr, "failed!");
+  //cudaStatus = cudaFree(partPoolCur);
+  //if (cudaStatus != cudaSuccess)
+   // fprintf(stderr, "failed!");
 
 }
+
+void part_mgr::AddCircle(float cx, float cy, float radius)
+{
+  if (shapesHost.nShapes == MAX_SHAPES)
+    return;
+  shapesHost.shapes[shapesHost.nShapes] = { SHAPE_CIRCLE, cx, cy, radius, 0 };
+  shapesHost.nShapes++;
+}
+
+void part_mgr::AddSquare(float x1, float y1, float x2, float y2)
+{
+
+}
+
+void part_mgr::AddSegment(float x1, float y1, float x2, float y2)
+{
+
+}
+
 
 

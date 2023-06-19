@@ -44,19 +44,43 @@ struct spawner_cbuf
   spawner spawners[20];
 };
 
+enum shape_type
+{
+  SHAPE_CIRCLE,
+  SHAPE_SQUARE,
+  SHAPE_SEGMENT
+};
+
+struct shape
+{
+  shape_type type;
+  float params[4]; // x1 y1 x2 y2 for square and segment, cx, cy, radius, 0 for circle
+};
+
+struct shapes_cbuf
+{
+  int nShapes;
+  shape shapes[20];
+};
+
 class part_mgr
 {
   particle* partPoolCur;
-  particle* partPoolPrev;
+  //particle* partPoolCur;
   spawner_cbuf spawnersHost;
+  shapes_cbuf shapesHost;
 
 public:
-  static const int MAX_PARTICLES = 1000;
+  static const int MAX_PARTICLES = 2000;
   static const int MAX_SPAWNERS = 20;
+  static const int MAX_SHAPES = 20;
 
   void Init(void);
   void Compute(cudaSurfaceObject_t s, dim3 texSize, double timeDelta);
   void Kill(void);
+  void AddCircle(float cx, float cy, float radius);
+  void AddSquare(float x1, float y1, float x2, float y2);
+  void AddSegment(float x1, float y1, float x2, float y2);
 };
 
 __global__ void Fill(cudaSurfaceObject_t s, dim3 texDim);

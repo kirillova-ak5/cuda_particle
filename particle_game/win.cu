@@ -50,6 +50,7 @@ void win::Display(void)
     cudaSurfaceObject_t writeSurface;
     e = cudaCreateSurfaceObject(&writeSurface, &wdsc);
 
+
     // clear background
     dim3 thread(32, 32);
     dim3 texDim(Instance.W, Instance.H);
@@ -69,6 +70,23 @@ void win::Display(void)
     glBlitFramebuffer(0, 0, Instance.W, Instance.H, 0, 0, Instance.W, Instance.H,
         GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
+
+
+    int i;
+    int lineAmount = 100; //# of triangles used to draw circle
+
+    GLfloat radius = 0.2f; //radius
+    GLfloat twicePi = 2 * 3.141592;
+    float ratio = (float)Instance.W / Instance.H;
+    glBegin(GL_LINE_LOOP);
+    for (i = 0; i <= lineAmount; i++) {
+      glVertex2f(
+        (0.5 + (radius * cos(i * twicePi / lineAmount))) / ratio,
+        0.5 + (radius * sin(i * twicePi / lineAmount))
+      );
+    }
+    glEnd();
+
     glFinish();
     glutSwapBuffers();
     glutPostRedisplay();
@@ -82,6 +100,8 @@ void win::Keyboard(unsigned char Key, int x, int y)
         exit(0);
     if (Key == 'F' || Key == 'f')
         glutFullScreenToggle();
+    if (Key == 'C' || Key == 'c')
+      Instance.partMgr.AddCircle(200, 200, 30);
 }
 
 void win::Run(void)
