@@ -211,13 +211,23 @@ void part_mgr::AddCircle(float cx, float cy, float radius)
 
 void part_mgr::AddSquare(float x1, float y1, float x2, float y2)
 {
-
+  if (shapesHost.nShapes == MAX_SHAPES)
+    return;
+  shapesHost.shapes[shapesHost.nShapes] = { SHAPE_SQUARE, x1, y1, x2, y2 };
+  shapesHost.nShapes++;
 }
 
 void part_mgr::AddSegment(float x1, float y1, float x2, float y2)
 {
-
+  if (shapesHost.nShapes == MAX_SHAPES)
+    return;
+  shapesHost.shapes[shapesHost.nShapes] = { SHAPE_SEGMENT, x1, y1, x2, y2 };
+  shapesHost.nShapes++;
 }
 
+const shapes_cbuf& part_mgr::GetShapes(void)
+{
+  return shapesHost;
+}
 
 

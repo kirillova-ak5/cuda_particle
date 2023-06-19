@@ -28,6 +28,8 @@ public:
 
   static void Keyboard(unsigned char Key, int x, int y);
 
+  static void Mouse(int button, int state, int x, int y);
+
   static void Run(void);
 
   win(void);

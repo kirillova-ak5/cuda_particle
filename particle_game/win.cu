@@ -16,6 +16,7 @@ win::win(void) : W(1280), H(736)
     glutCreateWindow("Feels bad man");
     glutDisplayFunc(Display);
     glutKeyboardFunc(Keyboard);
+    //glutMouseFunc(Mouse);
 
     glGenTextures(1, &screenBuf);
     glBindTexture(GL_TEXTURE_2D, screenBuf);
@@ -33,6 +34,10 @@ win::win(void) : W(1280), H(736)
     partMgr.Init();
 }
 
+inline float toNdc(int cPixel, int pixelsNum)
+{
+  return (float)cPixel / (float)pixelsNum * 2.0 - 1.0;
+}
 
 void win::Display(void)
 {
@@ -71,22 +76,44 @@ void win::Display(void)
         GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 
-
-    int i;
-    int lineAmount = 100; //# of triangles used to draw circle
-
-    GLfloat radius = 0.2f; //radius
-    GLfloat twicePi = 2 * 3.141592;
+    // draw shapes
+    const shapes_cbuf& shapes = Instance.partMgr.GetShapes();
     float ratio = (float)Instance.W / Instance.H;
-    glBegin(GL_LINE_LOOP);
-    for (i = 0; i <= lineAmount; i++) {
-      glVertex2f(
-        (0.5 + (radius * cos(i * twicePi / lineAmount))) / ratio,
-        0.5 + (radius * sin(i * twicePi / lineAmount))
-      );
+    int lineAmount = 100; //num of triangles used to draw circle
+    GLfloat twicePi = 2 * 3.141592;
+    for (int i = 0; i < shapes.nShapes; i++)
+    {
+      int x1 = shapes.shapes[i].params[0], y1 = shapes.shapes[i].params[1], x2 = shapes.shapes[i].params[2], y2 = shapes.shapes[i].params[3];
+      switch (shapes.shapes[i].type)
+      {
+      case SHAPE_CIRCLE:
+        glBegin(GL_LINE_LOOP);
+        for (int j = 0; j <= lineAmount; j++) {
+          glVertex2f(
+            toNdc(shapes.shapes[i].params[0] + (shapes.shapes[i].params[2] * cos(j * twicePi / lineAmount)), Instance.W),
+            toNdc(shapes.shapes[i].params[1] + (shapes.shapes[i].params[2] * sin(j * twicePi / lineAmount)), Instance.H)
+          );
+        }
+        glEnd();
+        break;
+      case SHAPE_SQUARE:
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(toNdc(x1, Instance.W), toNdc(y1, Instance.H));
+        glVertex2f(toNdc(x1, Instance.W), toNdc(y2, Instance.H));
+        glVertex2f(toNdc(x2, Instance.W), toNdc(y2, Instance.H));
+        glVertex2f(toNdc(x2, Instance.W), toNdc(y1, Instance.H));
+        glEnd();
+        break;
+      case SHAPE_SEGMENT:
+        glBegin(GL_LINES);
+        glVertex2f(toNdc(x1, Instance.W), toNdc(y1, Instance.H));
+        glVertex2f(toNdc(x2, Instance.W), toNdc(y2, Instance.H));
+        glEnd();
+        break;
+      default:
+        break;
+      }
     }
-    glEnd();
-
     glFinish();
     glutSwapBuffers();
     glutPostRedisplay();
@@ -101,7 +128,11 @@ void win::Keyboard(unsigned char Key, int x, int y)
     if (Key == 'F' || Key == 'f')
         glutFullScreenToggle();
     if (Key == 'C' || Key == 'c')
-      Instance.partMgr.AddCircle(200, 200, 30);
+      Instance.partMgr.AddCircle(700, 700, 100);
+    if (Key == 'Q' || Key == 'q')
+      Instance.partMgr.AddSquare(700, 700, 600, 500);
+    if (Key == 'S' || Key == 's')
+      Instance.partMgr.AddSegment(700, 700, 600, 500);
 }
 
 void win::Run(void)

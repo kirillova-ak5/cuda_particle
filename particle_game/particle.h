@@ -81,6 +81,7 @@ public:
   void AddCircle(float cx, float cy, float radius);
   void AddSquare(float x1, float y1, float x2, float y2);
   void AddSegment(float x1, float y1, float x2, float y2);
+  const shapes_cbuf& GetShapes(void);
 };
 
 __global__ void Fill(cudaSurfaceObject_t s, dim3 texDim);
