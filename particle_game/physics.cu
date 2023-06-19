@@ -1,5 +1,5 @@
-#include "physics.h"
-#include "particle.h"
+#include "physics.cuh"
+#include "particle.cuh"
 
 
 __device__ void erath_physics::affect(particle* p)

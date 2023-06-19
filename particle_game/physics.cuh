@@ -1,6 +1,4 @@
-#ifndef __PHYSICS_H_
-#define __PHYSICS_H_
-
+#pragma once
 #include "device_launch_parameters.h" // for kernel vars blockIdx and etc.
 
 struct particle;
@@ -21,7 +19,7 @@ public:
 	__device__	void affect(particle* p);
 
 private:
-	float g = 9.8;
+	float g = 9.8f;
 };
 
 class physics_manager {
@@ -34,13 +32,3 @@ private:
 	//space_physics space_physics;
 	//erath_physics erath_physics;
 };
-
-
-
-
-
-
-
-
-
-#endif __PHYSICS_H_

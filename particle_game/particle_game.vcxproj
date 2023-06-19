@@ -56,6 +56,7 @@
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <Include>$(SolutionDir)/INCLUDE/;%(Include)</Include>
+      <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -84,8 +85,8 @@
     <CudaCompile Include="win.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="particle.h" />
-    <ClInclude Include="physics.h" />
+    <ClInclude Include="particle.cuh" />
+    <ClInclude Include="physics.cuh" />
     <ClInclude Include="win.h" />
   </ItemGroup>
   <ItemGroup>

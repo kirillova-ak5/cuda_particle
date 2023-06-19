@@ -1,6 +1,7 @@
+#pragma once
 #include "INCLUDE/glatter/glatter.h"
 #include "INCLUDE/GL/freeglut.h"
-#include "physics.h"
+#include "physics.cuh"
 
 #include "cuda_runtime.h" // for cuda functions on host
 #include "cuda_gl_interop.h" // for cuda function about mapping OpenGL resources
@@ -11,7 +12,8 @@ enum part_type
 {
   PART_DEAD,
   PART_FIRST,
-  PART_SECOND
+  PART_SECOND,
+  PART_THIRD,
 };
 
 struct particle
@@ -54,7 +56,8 @@ enum shape_type
 struct shape
 {
   shape_type type;
-  float params[4]; // x1 y1 x2 y2 for square and segment, cx, cy, radius, 0 for circle
+  float params[4]; // x1 y1 x2 y2 for square and segment, (x1>x2, y1>y2)
+					//cx, cy, radius, 0 for circle
 };
 
 struct shapes_cbuf
@@ -82,8 +85,13 @@ public:
   void AddSquare(float x1, float y1, float x2, float y2);
   void AddSegment(float x1, float y1, float x2, float y2);
   const shapes_cbuf& GetShapes(void);
-  int SelectShape(int x, int y); // returns shapeHandle
-  void MoveShape(int shapeHandle, int dx, int dy);
 };
 
+__device__ __constant__ spawner_cbuf spawnersDevice;
+__device__ __constant__ shapes_cbuf shapesDevice;
+
 __global__ void Fill(cudaSurfaceObject_t s, dim3 texDim);
+__device__ void SquareCollision(shape* shape, particle* part, float shiftX, float shiftY);
+__device__ void CircleCollision(shape* shape, particle* part, float shiftX, float shiftY);
+__device__ void SegmentCollision(shape* shape, particle* part, float shiftX, float shiftY);
+__device__ void ShapesCollisionCheck(particle* part, double timeDelta);

@@ -1,12 +1,13 @@
-#include "particle.h"
-#include "physics.h"
+#include "particle.cuh"
+#include "physics.cuh"
 #include "math.h"
+#include <thrust/device_vector.h>
 
 #include "cudaGL.h" // for kernel function surf2Dwrite
 #include "device_launch_parameters.h" // for kernel vars blockIdx and etc.
 
-__device__ __constant__ spawner_cbuf spawnersDevice;
-__device__ __constant__ shapes_cbuf shapesDevice;
+#define min(a, b) (a > b)? b: a
+#define max(a, b) (a > b)? a: b 
 //__device__ __constant__ physics_manager phManager;
 
 
@@ -44,9 +45,15 @@ __global__ void DrawParticles(cudaSurfaceObject_t s, particle* poolCur, dim3 tex
   {
     return;
   }
-  float r = part.type == PART_FIRST ? 255 : 128;
-  float g = part.type == PART_FIRST ? 255 : 64;
-  float b = 0;
+  float r = 0, g = 0, b = 0;
+  switch (part.type) 
+  {
+  case PART_FIRST: {r = 255; g = 255; break; }
+  case PART_SECOND: {r = 128; g = 64; break; }
+  case PART_THIRD: {g = 200; break; }
+
+  }
+
   uchar4 data = make_uchar4(r, g, b, 0xff);
   surf2Dwrite(data, s, x * sizeof(uchar4), y);
   surf2Dwrite(data, s, (x + 1) * sizeof(uchar4), y);
@@ -109,9 +116,12 @@ __global__ void Update(particle* poolPrev, particle* poolCur, double timeDelta, 
     //phManager.physicsMakeAction(&poolCur[i]);
     if (poolCur[i].type == PART_DEAD)
       return;
-    poolCur[i].vy -= 0.00015 * timeDelta;   //уберу константу потом, когда решится вопрос с физикой
+    
+    ShapesCollisionCheck(&poolCur[i], timeDelta);
+    poolCur[i].vy -= 0.00015 * timeDelta;   // IDD: I will remove const soon. After physics discussion
     poolCur[i].x = poolPrev[i].x + poolPrev[i].vx * timeDelta;
     poolCur[i].y = poolPrev[i].y + poolPrev[i].vy * timeDelta;
+    
     CollisionCheck(poolPrev, poolCur, maxParticles);
     poolCur[i].remainingAliveTime = max(poolPrev[i].remainingAliveTime - timeDelta, 0.f);
     poolCur[i].type = poolPrev[i].remainingAliveTime > 0 ? poolPrev[i].type : PART_DEAD;
@@ -182,9 +192,9 @@ void part_mgr::Init(void)
     //cudaMemcpy(partPoolCur, tmp, sizeof(particle) * MAX_PARTICLES, cudaMemcpyHostToDevice);
 
     spawnersHost.nSpawners = 3;
-    spawnersHost.spawners[0] = { 600, 500, -0.35, 0.35, PART_FIRST, 0.005, 1, 8, 3000, EARTH_PHYSICS };
-    spawnersHost.spawners[1] = {700, 700, -0.25, -0.15, PART_SECOND, -0.008, 2, 10, 3000, SPACE};
-    //spawnersHost.spawners[2] = {500, 500, -0.00015, -0.00015, PART_SECOND, -0.05, 3, 10, 1500, SPACE};
+    spawnersHost.spawners[0] = { 600, 500, 0.35, 0.35, PART_FIRST, 0.005, 1, 8, 3000, EARTH_PHYSICS };
+    spawnersHost.spawners[1] = {700, 700, 0.25, -0.15, PART_SECOND, -0.008, 2, 10, 3000, SPACE};
+    spawnersHost.spawners[2] = {1000, 300, -0.15, 0.45, PART_THIRD, -0.005, 1, 10, 1500, SPACE};
     cudaMemcpyToSymbol(spawnersDevice, &spawnersHost, sizeof(spawner_cbuf));
 }
 
@@ -230,67 +240,125 @@ const shapes_cbuf& part_mgr::GetShapes(void)
   return shapesHost;
 }
 
-inline int sqr(int x)
-{
-  return x * x;
-}
 
-inline bool btw(int x, int x1, int x2)
-{
-  return x1 < x2 ? (x >= x1 && x <= x2) : (x <= x1 && x >= x2);
-}
+struct pt {
+    float x, y;
+};
 
-inline float dist(int x0, int y0, int x1, int y1, int x2, int y2)
+__device__ void ShapesCollisionCheck(particle* part, double timeDelta)
 {
-  return (float)abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1) / sqrt(sqr(y2 - y1) + sqr(x2 - x1));
-}
 
-int part_mgr::SelectShape(int x, int y)
-{
-  for (int i = 0; i < shapesHost.nShapes; i++)
-  {
-    shape& shp = shapesHost.shapes[i];
-    switch (shp.type)
+    float shiftX, shiftY;
+    shiftX = part->vx * timeDelta;
+    shiftY = part->vy * timeDelta;
+    shape sh;
+
+    for (int i = 0; i < shapesDevice.nShapes; i++)
     {
-    case SHAPE_CIRCLE:
-      if (sqr(x - shp.params[0]) + sqr(y - shp.params[1]) <= sqr(shp.params[2]))
-        return i;
-      break;
-    case SHAPE_SQUARE:
-      if (btw(x, shp.params[0], shp.params[2]) && btw(y, shp.params[1], shp.params[3]))
-        return i;
-    case SHAPE_SEGMENT:
-      if (btw(x, shp.params[0], shp.params[2]) && btw(y, shp.params[1], shp.params[3]) &&
-        dist(x, y, shp.params[0], shp.params[1], shp.params[2], shp.params[3]) < 5)
-        return i;
-        break;
-    default:
-      break;
+        sh = shapesDevice.shapes[i];
+        switch (sh.type)
+        {
+        case SHAPE_SQUARE: {SquareCollision(&sh, part, shiftX, shiftY); break; }
+        case SHAPE_SEGMENT: {SegmentCollision(&sh, part, shiftX, shiftY); break; }
+        case SHAPE_CIRCLE: {CircleCollision(&sh, part, shiftX, shiftY); break; }
+        }
     }
-  }
-  return -1;
 }
 
-void part_mgr::MoveShape(int shapeHandle, int dx, int dy)
+__device__ void CircleCollision(shape* shape, particle* part, float shiftX, float shiftY)
 {
-  if (shapeHandle < 0 || shapeHandle >= shapesHost.nShapes)
-    return;
-  shape& shp = shapesHost.shapes[shapeHandle];
-  switch (shp.type)
-  {
-  case SHAPE_CIRCLE:
-    shp.params[0] += dx;
-    shp.params[1] += dy;
-    break;
-  case SHAPE_SQUARE:
-  case SHAPE_SEGMENT:
-    shp.params[0] += dx;
-    shp.params[1] += dy;
-    shp.params[2] += dx;
-    shp.params[3] += dy;
-    break;
-  default:
-    break;
-  }
+    if (pow(part->y + shiftY - shape->params[1], 2) + pow(part->x + shiftX - shape->params[0], 2) <= shape->params[2] * shape->params[2])
+    {
+        pt prtcl = { part->vx, part->vy };
+        pt norm = { shape->params[0] - part->x, shape->params[1] - part->y };
+        float len = sqrt(pow(norm.x, 2) + pow(norm.y, 2));
+        norm = { norm.x / len, norm.y / len };
+        float t = 2 * (prtcl.x * norm.x + prtcl.y * norm.y);
+        norm = { t * norm.x, t * norm.y };
+        pt res = { prtcl.x - norm.x, prtcl.y - norm.y };
+        part->vx = res.x;
+        part->vy = res.y;
+    }  
 }
+
+__device__ void SquareCollision(shape* shape, particle* part, float shiftX, float shiftY)
+{
+    float newX = part->vx, newY = part->vy;
+    if (part->x + shiftX <= shape->params[0] && part->x + shiftX >= shape->params[2]
+        && part->y <= shape->params[1] && part->y >= shape->params[3])
+    {
+        newX *= -0.8;   //slowdown after hit
+    }
+
+    if (part->y + shiftY <= shape->params[1] && part->y + shiftY >= shape->params[3]
+        && part->x <= shape->params[0] && part->x >= shape->params[2])
+    {
+        newY *= -0.8;    //slowdown after hit
+    }
+
+    part->vx = newX;
+    part->vy = newY;
+}
+
+
+__device__  int area(pt a, pt b, pt c) {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+__device__  bool intersect_1(float a, float b, float c, float d) {
+    float t;
+    if (a > b)
+    {
+        t = a;
+        a = b;
+        b = t;
+    }
+    if (c > d)
+    {
+        t = c;
+        c = d;
+        d = t;
+    }
+    return max(a, c) <= min(b, d);
+}
+
+__device__ int sign(float x)
+{
+    float eps = 1e-1;
+    return x > eps ? 1 : (x < eps ? -1 : 0);
+}
+
+__device__ bool intersect(pt a, pt b, pt c, pt d) 
+{
+
+    return intersect_1(a.x, b.x, c.x, d.x)
+        && intersect_1(a.y, b.y, c.y, d.y)
+        && sign(area(a, b, c)) * sign(area(a, b, d)) <= 0
+        && sign(area(c, d, a)) * sign(area(c, d, b)) <= 0;
+}
+
+
+__device__ void SegmentCollision(shape* shape, particle* part, float shiftX, float shiftY)
+{
+    if (intersect(pt{ shape->params[0], shape->params[1] }, pt{ shape->params[2], shape->params[3] },
+        pt{ part->x, part->y }, pt{ part->x + shiftX, part->y + shiftY }))
+    {
+        pt prtcl = { part->vx, part->vy };
+        pt norm = { shape->params[1] - shape->params[3], - shape->params[0] + shape->params[2] };
+        float side = sign(area(pt{ shape->params[0], shape->params[1] },
+            pt{ shape->params[2], shape->params[3] }, pt{ part->x, part->y }));
+        norm = { norm.x * side, norm.y * side };
+
+        float len = sqrt(pow(norm.x, 2) + pow(norm.y, 2));
+        norm = { norm.x / len, norm.y / len };
+        float t = 2 * (prtcl.x * norm.x + prtcl.y * norm.y);
+        norm = { t * norm.x, t * norm.y };
+        pt res = { prtcl.x - norm.x, prtcl.y - norm.y };
+        part->vx = res.x;
+        part->vy = res.y;
+    }
+}
+
+
+
 

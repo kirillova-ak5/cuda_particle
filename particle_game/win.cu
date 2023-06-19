@@ -16,8 +16,7 @@ win::win(void) : W(1280), H(736)
     glutCreateWindow("Feels bad man");
     glutDisplayFunc(Display);
     glutKeyboardFunc(Keyboard);
-    glutMouseFunc(Mouse);
-    glutMotionFunc(MouseMotion);
+    //glutMouseFunc(Mouse);
 
     glGenTextures(1, &screenBuf);
     glBindTexture(GL_TEXTURE_2D, screenBuf);
@@ -129,37 +128,12 @@ void win::Keyboard(unsigned char Key, int x, int y)
     if (Key == 'F' || Key == 'f')
         glutFullScreenToggle();
     if (Key == 'C' || Key == 'c')
-      Instance.partMgr.AddCircle(700, 700, 100);
+      Instance.partMgr.AddCircle(1000, 300, 100);
     if (Key == 'Q' || Key == 'q')
-      Instance.partMgr.AddSquare(700, 700, 600, 500);
+      Instance.partMgr.AddSquare(1000, 550, 800, 400);
     if (Key == 'S' || Key == 's')
-      Instance.partMgr.AddSegment(700, 700, 600, 500);
+      Instance.partMgr.AddSegment(650, 400, 900, 700);
 }
-
-void win::Mouse(int button, int state, int x, int y)
-{
-  if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN)
-  {
-    Instance.shapeSelected = Instance.partMgr.SelectShape(x, Instance.H - y);
-    if (Instance.shapeSelected != -1)
-    {
-      Instance.prevX = x;
-      Instance.prevY = y;
-    }
-  }
-  if (button == GLUT_LEFT_BUTTON && state == GLUT_UP)
-    Instance.shapeSelected = -1;
-}
-
-void win::MouseMotion(int x, int y)
-{
-  if (Instance.shapeSelected == -1)
-    return;
-  Instance.partMgr.MoveShape(Instance.shapeSelected, x - Instance.prevX, Instance.prevY - y);
-  Instance.prevX = x;
-  Instance.prevY = y;
-}
-
 
 void win::Run(void)
 {
