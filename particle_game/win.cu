@@ -131,7 +131,7 @@ void win::Display(void)
     }
   }
   char buf[200] = { 0 };
-  sprintf(buf, "Current parts in basket: %i", Instance.partMgr.GetInbasket());
+  sprintf(buf, "Press q, s, c for spawn rectangle, segment, circle. Current parts in basket: %i.", Instance.partMgr.GetInbasket());
   glutSetWindowTitle(buf);
   if (Instance.partMgr.GetInbasket() >= Instance.partMgr.NUM_INBASKET_PARTS_TO_WIN)
   {
@@ -144,7 +144,7 @@ void win::Display(void)
   glutSwapBuffers();
   glutPostRedisplay();
 }
-#pragma optimize("", off)
+
 void win::Keyboard(unsigned char Key, int x, int y)
 {
   if (Key == 27)
@@ -158,7 +158,6 @@ void win::Keyboard(unsigned char Key, int x, int y)
   if (Key == 'S' || Key == 's')
     Instance.partMgr.AddSegment(650, 400, 900, 700);
 }
-#pragma optimize("", on)
 
 void win::Mouse(int button, int state, int x, int y)
 {
